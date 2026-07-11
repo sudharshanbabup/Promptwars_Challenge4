@@ -1,21 +1,27 @@
-# Ignore Google Cloud SDK installation
-google-cloud-sdk/
-
-# Ignore Node.js dependencies
+# Dependencies
 node_modules/
-**/node_modules/
 
-# OS Files
-.DS_Store
-Thumps.db
-
-# Build/Dist directories
+# Production builds
 dist/
-**/dist/
 
-# Local env files
+# Env & Secrets
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# GCP SDK (local environment asset)
+google-cloud-sdk/
