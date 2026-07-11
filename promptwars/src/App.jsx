@@ -30,11 +30,22 @@ import {
 const STEP_COUNT = 4;
 
 function App() {
+  // Config state
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const [showConfig, setShowConfig] = useState(false);
+
   // Navigation
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
   const [error, setError] = useState('');
+
+  // Save API Key
+  const handleSaveKey = (key) => {
+    setApiKey(key.trim());
+    localStorage.setItem('gemini_api_key', key.trim());
+    setShowConfig(false);
+  };
 
   // Step 1: Servings & Meals
   const [numPeople, setNumPeople] = useState(2);
@@ -276,8 +287,18 @@ In the "groceryList", set "onHand" to true for ingredients the user explicitly s
           </div>
           <h1>MealFlow</h1>
         </div>
-        <div className="header-badge">
-          <span className="badge-beta">Production Build</span>
+        
+        <div className="header-actions">
+          <button 
+            onClick={() => setShowConfig(true)} 
+            className={`btn-key ${apiKey ? 'active' : ''}`}
+          >
+            <Key className="btn-icon" />
+            {apiKey ? 'Gemini Configured' : 'Configure Gemini Key'}
+          </button>
+          <div className="header-badge">
+            <span className="badge-beta">Production Build</span>
+          </div>
         </div>
       </header>
 
@@ -765,6 +786,70 @@ In the "groceryList", set "onHand" to true for ingredients the user explicitly s
         )}
 
       </main>
+
+      {/* Settings Modal */}
+      {showConfig && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
+              <Settings className="modal-icon" />
+              <h3>Configure Gemini API Key</h3>
+            </div>
+            
+            <div className="modal-body">
+              <p className="modal-desc">
+                Input your <strong>Gemini API Key</strong> to authenticate calls. Your key is stored safely only in your browser storage (`localStorage`).
+              </p>
+              
+              <div className="key-setup-hint">
+                <p>💡 You can get a free key instantly from Google AI Studio:</p>
+                <a 
+                  href="https://aistudio.google.com/" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="studio-link"
+                >
+                  Open Google AI Studio &rarr;
+                </a>
+              </div>
+
+              <div className="input-group">
+                <label>Gemini API Key</label>
+                <input 
+                  type="password"
+                  placeholder="AIzaSy..."
+                  defaultValue={apiKey}
+                  id="api-key-input"
+                  className="modal-key-input"
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                onClick={() => setShowConfig(false)} 
+                className="btn-cancel"
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => {
+                  const val = document.getElementById('api-key-input').value;
+                  handleSaveKey(val);
+                }} 
+                className="btn-save"
+              >
+                Save Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="arena-footer">
+        <p>MealFlow Cooking Planner &bull; Google Prompt Wars Event Submission</p>
+      </footer>
     </div>
   );
 }
