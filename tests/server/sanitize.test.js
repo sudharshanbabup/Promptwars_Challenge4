@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitizeText, sanitizeChoice } from './sanitize.js';
+import { sanitizeText, sanitizeChoice } from '../../src/server/lib/sanitize.js';
 
 test('sanitizeText throws on non-string', () => {
   assert.throws(() => sanitizeText(123), /Input must be a string/);

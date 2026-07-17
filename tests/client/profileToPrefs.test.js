@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapTogglesToPrefs } from './profileToPrefs.js';
+import { mapTogglesToPrefs } from '../../src/client/lib/profileToPrefs.js';
 
 test('mapTogglesToPrefs calculates correct access flags and alerts', () => {
   const toggles = {

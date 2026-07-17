@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assistHandler } from './assist.js';
+import { assistHandler } from '../../src/server/routes/assist.js';
 
 // Configure test environment variable
 process.env.NODE_ENV = 'test';

@@ -24,5 +24,5 @@
     "esModuleInterop": true,
     "allowJs": true
   },
-  "include": ["src/**/*.js", "src/**/*.jsx", "server/**/*.js"]
+  "include": ["src/**/*.js", "src/**/*.jsx", "tests/**/*.js"]
 }

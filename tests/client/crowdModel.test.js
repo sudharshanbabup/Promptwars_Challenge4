@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getCongestion } from './crowdModel.js';
+import { getCongestion } from '../../src/client/lib/crowdModel.js';
 
 test('getCongestion yields correct outputs based on hours and zones', () => {
   // Peak hour

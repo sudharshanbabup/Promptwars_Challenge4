@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getMetrics } from './sustainMetrics.js';
+import { getMetrics } from '../../src/client/lib/sustainMetrics.js';
 
 test('getMetrics computes expected percentage ranges', () => {
   const metrics = getMetrics(12);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TokenBucket } from './rateLimit.js';
+import { TokenBucket } from '../../src/server/middleware/rateLimit.js';
 
 test('TokenBucket allows requests up to max capacity', () => {
   const bucket = new TokenBucket(3, 1 / 1000);

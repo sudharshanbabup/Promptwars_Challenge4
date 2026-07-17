@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sortBySeverity, topN } from './prioritize.js';
+import { sortBySeverity, topN } from '../../src/client/lib/prioritize.js';
 
 test('sortBySeverity places High severity first', () => {
   const input = [

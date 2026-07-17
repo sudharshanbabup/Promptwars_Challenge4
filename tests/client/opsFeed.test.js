@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getSignals } from './opsFeed.js';
+import { getSignals } from '../../src/client/lib/opsFeed.js';
 
 test('getSignals yields standard alerts', () => {
   const alerts = getSignals(12);

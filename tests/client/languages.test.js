@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLangPair } from './languages.js';
+import { validateLangPair } from '../../src/client/lib/languages.js';
 
 test('validateLangPair permits valid language combinations', () => {
   assert.ok(validateLangPair('EN', 'ES'));

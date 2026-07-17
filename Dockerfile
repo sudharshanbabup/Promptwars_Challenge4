@@ -15,7 +15,7 @@ RUN npm ci --omit=dev --legacy-peer-deps
 
 # Copy only the compiled client assets and server code
 COPY --from=builder /app/dist ./dist
-COPY server/ ./server/
+COPY src/server/ ./server/
 
 # Create a non-root user for security
 RUN addgroup -S nodeuser && adduser -S nodeuser -G nodeuser

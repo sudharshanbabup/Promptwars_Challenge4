@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rankModes } from './co2Rank.js';
+import { rankModes } from '../../src/client/lib/co2Rank.js';
 
 test('rankModes sorts travel modes by eco-friendliness', () => {
   const input = ['car', 'walk', 'transit'];

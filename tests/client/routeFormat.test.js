@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRoute } from './routeFormat.js';
+import { parseRoute } from '../../src/client/lib/routeFormat.js';
 
 test('parseRoute handles empty and structured lines', () => {
   const text = `
