@@ -1,20 +1,30 @@
 import express from 'express';
 import path from 'path';
+import compression from 'compression';
+import helmet from 'helmet';
 import { rateLimiter } from './middleware/rateLimit.js';
 import { assistRouter } from './routes/assist.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// 1. Manually applied security and CORS headers
-app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('X-XSS-Protection', '0');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com");
+// 1. Apply Helmet for security headers and Compression for efficiency
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"]
+    }
+  }
+}));
+app.use(compression());
 
-  // Restrictive CORS policy for local Vite frontend dev server
+// 2. Add custom CORS headers for local Vite dev
+app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -25,16 +35,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// 2. Parse JSON with a strict size limit of 32KB
+// 3. Parse JSON with a strict size limit of 32KB
 app.use(express.json({ limit: '32kb' }));
 
-// 3. Mount rate limiter on all API endpoints
+// 4. Mount rate limiter on all API endpoints
 app.use('/api', rateLimiter);
 
-// 4. Mount route handlers
+// 5. Mount route handlers
 app.use(assistRouter);
 
-// 5. Serve static assets in production
+// 6. Serve static assets in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static('dist'));
   app.get('*', (req, res) => {
@@ -42,13 +52,13 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// 6. Global Express error handler
+// 7. Global Express error handler
 app.use((err, req, res, next) => {
   console.error('[Global Error]:', err.message || err);
   res.status(500).json({ error: 'An unexpected backend error occurred.' });
 });
 
-// 7. Listen on configured port
+// 8. Listen on configured port
 app.listen(PORT, () => {
   console.log(`[BOOT] MatchDay Nexus backend proxy listening on port ${PORT}`);
 });

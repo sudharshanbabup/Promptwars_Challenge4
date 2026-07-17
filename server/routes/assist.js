@@ -9,14 +9,15 @@ const ALLOWED_FEATURES = ['navigation', 'accessibility', 'multilingual', 'sustai
 const ALLOWED_ROLES = ['fan', 'organizer', 'volunteer', 'staff'];
 
 /**
- * Express POST /api/assist route handler.
- * Proxies and sanitizes user queries to Google Gemini.
+ * Tactical assist handler logic. Separated for easy unit-testing.
+ * 
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
  */
-router.post('/api/assist', async (req, res) => {
+export async function assistHandler(req, res) {
   try {
     const { feature, role, payload } = req.body;
 
-    // 1. Validate parameters against strict allow-lists
     const cleanFeature = sanitizeChoice(feature, ALLOWED_FEATURES);
     const cleanRole = sanitizeChoice(role, ALLOWED_ROLES);
 
@@ -24,7 +25,6 @@ router.post('/api/assist', async (req, res) => {
       return res.status(400).json({ error: 'Payload must be a valid JSON object' });
     }
 
-    // 2. Sanitize payload properties
     const cleanPayload = {};
     for (const [key, val] of Object.entries(payload)) {
       if (typeof val === 'string') {
@@ -34,16 +34,19 @@ router.post('/api/assist', async (req, res) => {
       } else if (Array.isArray(val)) {
         cleanPayload[key] = val.map(item => typeof item === 'string' ? sanitizeText(item) : item);
       } else if (val && typeof val === 'object') {
-        cleanPayload[key] = val; // Nested structures passed as-is
+        cleanPayload[key] = val;
       }
     }
 
-    // 3. Select prompt and invoke Gemini
+    // Bypass live GenAI call under Node test environments
+    if (process.env.NODE_ENV === 'test') {
+      return res.json({ text: `Mocked AI response for feature ${cleanFeature} and role ${cleanRole}` });
+    }
+
     const systemPrompt = prompts[cleanFeature];
     const userPrompt = `Role Context: ${cleanRole}. Inputs: ${JSON.stringify(cleanPayload)}`;
 
     const result = await generate({ system: systemPrompt, user: userPrompt });
-
     res.json({ text: result.text });
   } catch (error) {
     console.error('[API Proxy Error]:', error.message || error);
@@ -51,6 +54,8 @@ router.post('/api/assist', async (req, res) => {
       error: 'An operational safety engine error occurred. Please follow physical stadium signs.'
     });
   }
-});
+}
+
+router.post('/api/assist', assistHandler);
 
 export { router as assistRouter };
