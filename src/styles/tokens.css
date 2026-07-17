@@ -1,0 +1,25 @@
+:root {
+  --bg: #0B1220;
+  --surface: #16213A;
+  --surface-2: #1F2D4D;
+  --text: #F4F7FB;
+  --text-dim: #C3CEDE;
+  --accent: #4FD1A1;
+  --accent-ink: #062015;
+  --focus: #8AB4FF;
+  --danger: #FF8A8A;
+  --warn: #FFD466;
+  --ok: #7BE0A0;
+
+  /* Spacing Scale */
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+
+  /* Radius and Target Constants */
+  --radius-12: 12px;
+  --min-touch: 44px;
+}

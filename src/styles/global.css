@@ -1,0 +1,124 @@
+@import './tokens.css';
+
+/* Global Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Accessibility Focus-Visible Rings */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Base Form Inputs */
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  border-radius: var(--radius-12);
+  min-height: var(--min-touch);
+  min-width: var(--min-touch);
+  padding: 0 var(--space-16);
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+button.primary {
+  background-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+button.primary:hover {
+  background-color: #3eb88d;
+}
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+  background-color: var(--surface-2);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-12);
+  padding: var(--space-12);
+  font-family: inherit;
+  font-size: 0.95rem;
+  min-height: var(--min-touch);
+}
+
+/* Visually Hidden Utility for Accessibility Screen Readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* Glassmorphism panel styling */
+.glass-panel {
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-12);
+  padding: var(--space-24);
+  backdrop-filter: blur(10px);
+}
+
+/* Shared UI Layout Utility Classes */
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.gap-8 { gap: var(--space-8); }
+.gap-12 { gap: var(--space-12); }
+.gap-16 { gap: var(--space-16); }
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-12);
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-12);
+}
+
+.card-metric {
+  padding: var(--space-12);
+  background-color: var(--surface-2);
+  border-radius: 8px;
+}
+
+.badge-severity {
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
