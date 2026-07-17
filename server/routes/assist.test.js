@@ -49,8 +49,8 @@ test('assistHandler rejects invalid choice parameters', async () => {
   };
 
   await assistHandler(req, res);
-  assert.strictEqual(statusCode, 500);
-  assert.ok(jsonResult.error.includes('operational safety engine error'));
+  assert.strictEqual(statusCode, 400);
+  assert.ok(jsonResult.error.includes('Validation failed'));
 });
 
 test('assistHandler rejects invalid payload parameter', async () => {
