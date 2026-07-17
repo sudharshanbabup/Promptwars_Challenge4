@@ -1,80 +1,73 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assistHandler } from '../../src/server/routes/assist.js';
+import express from 'express';
+import { assistRouter } from '../../src/server/routes/assist.js';
 
-// Configure test environment variable
-process.env.NODE_ENV = 'test';
+const app = express();
+app.use(express.json());
+app.use(assistRouter);
 
-test('assistHandler succeeds with valid parameters', async () => {
+test('POST /api/assess returns valid assessment payload', async () => {
+  // Mock request using a simple fetch-like execution context or calling handlers directly
+  let jsonResult = null;
   const req = {
     body: {
-      feature: 'navigation',
       role: 'fan',
-      payload: { query: 'Find Section 112' }
+      zone: 'Zone A (Gates)',
+      accessibility: { wheelchair: true },
+      language: 'en'
     }
   };
-
-  let jsonResult = null;
   const res = {
     json: (data) => {
       jsonResult = data;
-    },
-    status: () => res
+    }
   };
 
-  await assistHandler(req, res);
+  // Find POST /api/assess route
+  const route = assistRouter.stack.find(s => s.route?.path === '/api/assess');
+  await route.route.stack[0].handle(req, res);
+
   assert.ok(jsonResult);
-  assert.strictEqual(jsonResult.text, 'Mocked AI response for feature navigation and role fan');
+  assert.ok(jsonResult.assessment);
+  assert.strictEqual(typeof jsonResult.assessment.score, 'number');
+  assert.ok(jsonResult.plan);
 });
 
-test('assistHandler rejects invalid choice parameters', async () => {
+test('POST /api/chat returns response', async () => {
+  let jsonResult = null;
   const req = {
     body: {
-      feature: 'hacker-feature',
-      role: 'fan',
-      payload: { query: 'test' }
+      message: 'Where is section 100?',
+      profileDigest: { level: 'Safe', score: 20, vulnerabilities: [], language: 'en' },
+      history: []
     }
   };
-
-  let statusCode = null;
-  let jsonResult = null;
   const res = {
-    status: (code) => {
-      statusCode = code;
-      return res;
-    },
     json: (data) => {
       jsonResult = data;
     }
   };
 
-  await assistHandler(req, res);
-  assert.strictEqual(statusCode, 400);
-  assert.ok(jsonResult.error.includes('Validation failed'));
+  const route = assistRouter.stack.find(s => s.route?.path === '/api/chat');
+  await route.route.stack[0].handle(req, res);
+
+  assert.ok(jsonResult);
+  assert.ok(jsonResult.text);
 });
 
-test('assistHandler rejects invalid payload parameter', async () => {
-  const req = {
-    body: {
-      feature: 'navigation',
-      role: 'fan',
-      payload: 'invalid-payload-string'
-    }
-  };
-
-  let statusCode = null;
+test('GET /api/alerts returns safety alerts', async () => {
   let jsonResult = null;
+  const req = { query: { lat: '40.81', lon: '-74.07' } };
   const res = {
-    status: (code) => {
-      statusCode = code;
-      return res;
-    },
     json: (data) => {
       jsonResult = data;
     }
   };
 
-  await assistHandler(req, res);
-  assert.strictEqual(statusCode, 400);
-  assert.strictEqual(jsonResult.error, 'Payload must be a valid JSON object');
+  const route = assistRouter.stack.find(s => s.route?.path === '/api/alerts');
+  await route.route.stack[0].handle(req, res);
+
+  assert.ok(jsonResult);
+  assert.strictEqual(typeof jsonResult.score, 'number');
 });

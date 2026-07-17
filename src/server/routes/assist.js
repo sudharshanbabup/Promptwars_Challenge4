@@ -1,117 +1,166 @@
 import express from 'express';
 import { sanitizeChoice, sanitizeText } from '../lib/sanitize.js';
-import { generate } from '../lib/geminiClient.js';
-import { prompts } from '../lib/prompts.js';
+import { getStadiumWeather } from '../lib/weatherService.js';
+import { getLiveTelemetry } from '../lib/telemetryService.js';
+import { assessStadiumRisk } from '../../client/lib/opsRiskEngine.js';
+import { compileFallbackPlan } from '../../client/lib/fallbackPlan.js';
+import { generateAIAssessment, generateAIChat } from '../lib/geminiClient.js';
 
 const router = express.Router();
 
-const ALLOWED_FEATURES = ['navigation', 'accessibility', 'multilingual', 'sustainability', 'ops'];
 const ALLOWED_ROLES = ['fan', 'organizer', 'volunteer', 'staff'];
+const ALLOWED_ZONES = ['Zone A (Gates)', 'Zone B (Concourse)', 'Zone C (Stands Section 100)', 'Zone D (Stands Section 200)'];
+const ALLOWED_LANGUAGES = ['en', 'hi', 'mr', 'bn', 'ta', 'te', 'ml', 'kn', 'gu', 'or', 'as', 'es', 'fr', 'pt', 'ar', 'de', 'ja', 'ko', 'zh'];
 
 /**
- * Returns a complete, useful fallback text when the GenAI service is unavailable.
- * 
- * @param {string} feature - The requested feature.
- * @param {object} payload - Input parameters.
- * @returns {string} Fully readable fallback instruction text.
+ * POST /api/assess
+ * Handles safety and crowd operations assessments for the stadium.
  */
-function getDeterministicFallback(feature, payload) {
-  if (feature === 'navigation') {
-    return `1. Proceed along the main concourse corridor.
-2. Follow green overhead signs pointing toward your target.
-3. Reroute via the outer bypass walkway to avoid the congested zones.
-Advice: Avoid Zone A (Gates) and Zone C (Food Court) due to high crowds.`;
+router.post('/api/assess', async (req, res, next) => {
+  try {
+    const raw = req.body || {};
+
+    // 1. Dual-Compatibility parsing: checks for weather/monsoon coordinates or stadium inputs
+    let lat = 40.81;
+    let lon = -74.07;
+    if (raw.location && typeof raw.location.lat === 'number') {
+      lat = raw.location.lat;
+      lon = raw.location.lon;
+    }
+
+    let role = 'fan';
+    if (raw.role) {
+      role = sanitizeChoice(raw.role, ALLOWED_ROLES);
+    } else if (raw.dwelling) {
+      // map monsoon dwelling to roles for stadium context
+      role = raw.dwelling === 'independent_house' ? 'organizer' : 'fan';
+    }
+
+    let zone = 'Zone B (Concourse)';
+    if (raw.zone) {
+      zone = sanitizeChoice(raw.zone, ALLOWED_ZONES);
+    }
+
+    const accessibility = {
+      wheelchair: !!(raw.accessibility?.wheelchair || raw.members?.disabled > 0),
+      sensorySensitive: !!(raw.accessibility?.sensorySensitive || raw.members?.infants > 0),
+      assistanceRequired: !!(raw.accessibility?.assistanceRequired || raw.members?.seniors > 0)
+    };
+
+    let language = 'en';
+    if (raw.language) {
+      language = sanitizeChoice(raw.language.toLowerCase(), ALLOWED_LANGUAGES);
+    }
+
+    const profile = { lat, lon, role, zone, accessibility, language };
+
+    // 2. Fetch Live weather and telemetry status
+    const weather = await getStadiumWeather(lat, lon);
+    const telemetry = getLiveTelemetry();
+
+    // 3. Evaluate deterministic risk calculations
+    const assessment = assessStadiumRisk(telemetry, weather, profile);
+
+    // 4. Generate AI advisory or compile fallback
+    const planText = await generateAIAssessment(telemetry, assessment, profile);
+
+    res.json({
+      assessment,
+      plan: planText,
+      weather,
+      degraded: planText.includes('Deterministic')
+    });
+  } catch (error) {
+    next(error);
   }
-  if (feature === 'accessibility') {
-    const prefs = payload.prefs || {};
-    const lines = ['[Safety Advisory Plan]'];
-    if (prefs.stepFreeRequired) lines.push('• Ramp access and elevator routes are active at Gate C.');
-    if (prefs.sensoryFriendlyRequired) lines.push('• Pyrotechnics alert: Sensory room open near Section 112.');
-    if (prefs.assistanceRequired) lines.push('• Contact closest yellow-vest volunteer for tactile guide maps.');
-    if (lines.length === 1) lines.push('• Standard step-free access lanes are active at all entrance gates.');
-    return lines.join('\n');
-  }
-  if (feature === 'multilingual') {
-    const src = payload.sourceLang || 'EN';
-    const tgt = payload.targetLang || 'ES';
-    const original = payload.text || '';
-    return `[Translation Offline - ${src} to ${tgt}]
-Phrase: "${original}"
-Pronunciation: (Pronunciation guide offline)
-Advisory: Translation service is temporarily offline. Please consult physical signs or check with stadium helpers.`;
-  }
-  if (feature === 'sustainability') {
-    return `Advisory Carbon Plan:
-• Public transit (metro/bus) is the highest capacity option.
-• Walking or cycling contributes zero carbon footprint.
-• Parking is limited; electric vehicles receive preferred charging parking at Gate E.`;
-  }
-  // Ops intelligence fallback
-  return `Tactical Ops Action Brief:
-1. REDIRECT staff to Gate B queue bottleneck immediately.
-2. ACTIVATE Section 114 medical relief protocols for heat exhaustion.
-3. MONITOR forecast; prepare rain canopy coverings at outer gates.`;
-}
+});
 
 /**
- * Express POST /api/assist route handler.
- * 
- * @param {import('express').Request} req
- * @param {import('express').Response} res
+ * POST /api/chat
+ * Handles conversational queries.
  */
-export async function assistHandler(req, res) {
-  let cleanFeature;
-  let cleanRole;
-  let cleanPayload = {};
-
-  // 1. Validation phase (throws on bad parameters)
+router.post('/api/chat', async (req, res, next) => {
   try {
-    const { feature, role, payload } = req.body;
+    const { message, profileDigest, history } = req.body || {};
 
-    cleanFeature = sanitizeChoice(feature, ALLOWED_FEATURES);
-    cleanRole = sanitizeChoice(role, ALLOWED_ROLES);
-
-    if (!payload || typeof payload !== 'object') {
-      return res.status(400).json({ error: 'Payload must be a valid JSON object' });
+    if (typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message must be a string' });
     }
 
-    for (const [key, val] of Object.entries(payload)) {
-      if (typeof val === 'string') {
-        cleanPayload[key] = sanitizeText(val);
-      } else if (typeof val === 'boolean' || typeof val === 'number') {
-        cleanPayload[key] = val;
-      } else if (Array.isArray(val)) {
-        cleanPayload[key] = val.map(item => typeof item === 'string' ? sanitizeText(item) : item);
-      } else if (val && typeof val === 'object') {
-        cleanPayload[key] = val;
-      }
-    }
+    const cleanMsg = sanitizeText(message);
+    const digest = profileDigest || { level: 'Safe', score: 20, vulnerabilities: [], language: 'en' };
+    const formattedHistory = Array.isArray(history) ? history.slice(0, 6) : [];
+
+    const reply = await generateAIChat(cleanMsg, digest, formattedHistory);
+    res.json({ text: reply });
   } catch (error) {
-    console.error('[Validation Error]:', error.message || error);
-    return res.status(400).json({ error: `Validation failed: ${error.message}` });
+    next(error);
   }
+});
 
-  // 2. GenAI execution phase (degrades gracefully on model errors)
+/**
+ * GET /api/alerts
+ * Light-weight high frequency status monitoring.
+ */
+router.get('/api/alerts', async (req, res, next) => {
   try {
-    if (process.env.NODE_ENV === 'test') {
-      return res.json({ text: `Mocked AI response for feature ${cleanFeature} and role ${cleanRole}` });
-    }
+    const lat = parseFloat(req.query.lat) || 40.81;
+    const lon = parseFloat(req.query.lon) || -74.07;
 
-    const systemPrompt = prompts[cleanFeature];
-    const userPrompt = `Role Context: ${cleanRole}. Inputs: ${JSON.stringify(cleanPayload)}`;
+    const weather = await getStadiumWeather(lat, lon);
+    const telemetry = getLiveTelemetry();
+    const assessment = assessStadiumRisk(telemetry, weather, { zone: 'Zone B (Concourse)', accessibility: {} });
 
-    const result = await generate({ system: systemPrompt, user: userPrompt });
-    res.json({ text: result.text });
+    res.json({
+      level: assessment.level,
+      score: assessment.score,
+      isCoastal: false
+    });
   } catch (error) {
-    // Log the error silently on the server
-    console.warn(`[GenAI Failed - Graceful Degradation]: ${error.message || error}`);
-    
-    // Serve a complete, useful plan from the deterministic fallback engine
-    const fallbackText = getDeterministicFallback(cleanFeature, cleanPayload);
-    res.json({ text: fallbackText });
+    next(error);
   }
-}
+});
 
-router.post('/api/assist', assistHandler);
+/**
+ * GET /api/emergency
+ * Static contact list endpoint.
+ */
+router.get('/api/emergency', (req, res) => {
+  res.json({
+    nationalEmergency: '112',
+    ambulance: '108',
+    districtDisasterControl: '1077',
+    ndma: '1078',
+    waterWaterlogging: '1916',
+    electricity: '1912',
+    police: '100',
+    fire: '101',
+    stadiumSecurity: '011-2026-FIFA',
+    firstAid: '011-2026-AID',
+    transitPolice: '011-2026-TRAIN'
+  });
+});
+
+/**
+ * GET /api/health
+ * Returns service uptime and monitoring.
+ */
+router.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    uptime: parseFloat(process.uptime().toFixed(1))
+  });
+});
+
+// Legacy backward-compatibility endpoint
+router.post('/api/assist', async (req, res) => {
+  const { feature, role, payload } = req.body || {};
+  const weather = await getStadiumWeather(40.81, -74.07);
+  const telemetry = getLiveTelemetry();
+  const profile = { role: role || 'fan', zone: payload?.zone || 'Zone B (Concourse)', accessibility: payload?.prefs || {} };
+  const assessment = assessStadiumRisk(telemetry, weather, profile);
+  const text = compileFallbackPlan(assessment, profile);
+  res.json({ text });
+});
 
 export { router as assistRouter };

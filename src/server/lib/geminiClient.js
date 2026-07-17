@@ -1,54 +1,119 @@
+/**
+ * Server service calling Google Gemini API with token limits.
+ */
 import { GoogleGenAI } from '@google/genai';
+import { compileFallbackPlan } from '../../client/lib/fallbackPlan.js';
 
 let aiInstance = null;
 
 /**
- * Initializes and returns the Google GenAI client instance.
+ * Lazily instantiates and returns the Gemini client if API key is present.
  * 
- * @returns {GoogleGenAI} The GenAI client.
- * @throws {Error} If GEMINI_API_KEY is not defined.
+ * @returns {GoogleGenAI|null} Gemini client.
  */
-function getAiClient() {
-  if (!aiInstance) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is not configured');
-    }
-    aiInstance = new GoogleGenAI({ apiKey });
-  }
+function getClient() {
+  if (aiInstance) return aiInstance;
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  aiInstance = new GoogleGenAI({ apiKey: key });
   return aiInstance;
 }
 
 /**
- * Sends a generation request to the Gemini 2.5 Flash model.
+ * Generates personalized safety and operations briefs based on telemetry.
  * 
- * @param {object} params - Input parameters.
- * @param {string} params.system - System instruction context.
- * @param {string} params.user - User message prompt.
- * @returns {Promise<{text: string}>} The generated text result.
- * @throws {Error} If the API call fails or inputs are invalid.
+ * @param {object} telemetry - Live stadium telemetry.
+ * @param {object} assessment - Deterministic risk evaluation.
+ * @param {object} profile - Visitor demographic configuration.
+ * @returns {Promise<string>} Plan markdown string.
  */
-export async function generate({ system, user }) {
-  if (!system || !user) {
-    throw new Error('Both system and user prompts are required');
+export async function generateAIAssessment(telemetry, assessment, profile) {
+  const client = getClient();
+  const fallback = compileFallbackPlan(assessment, profile);
+
+  if (!client) {
+    console.warn('[Gemini Client]: Missing API Key. Servicing offline fallback.');
+    return fallback;
   }
 
+  const prompt = `
+You are the FIFA World Cup 2026 Smart Stadium Operations safety AI.
+Evaluate the following telemetry data and user profile to output a highly personalized, friendly action plan.
+
+Live Stadium Telemetry:
+- Queue Wait Times: ${JSON.stringify(telemetry.queues)}
+- Crowd Densities: ${JSON.stringify(telemetry.zoneDensities)}
+- Active Incidents: ${telemetry.activeIncidents.join(', ')}
+
+Visitor Context:
+- Role: ${profile.role}
+- Zone: ${profile.zone}
+- Accessibility Needs: ${JSON.stringify(profile.accessibility)}
+- Target Language: ${profile.language}
+
+Deterministic Advisory Assessment:
+- Operations Congestion Risk Score: ${assessment.score}/100
+- Advisory Level: ${assessment.level}
+- Primary Risk Drivers: ${assessment.drivers.join('; ')}
+
+Strict constraint: Write a concise layout guide (under 15 lines) of operations directions tailored for this visitor. Use markdown.
+Always append this notice: "AI guidance — always follow local stadium steward orders and World Cup safety protocol."
+  `;
+
   try {
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
+    const response = await client.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: [{ role: 'user', parts: [{ text: user }] }],
-      config: {
-        systemInstruction: system,
-        maxOutputTokens: 1000,
-        // Suppress thinking tokens to save latency and cost
-        thinkingConfig: { thinkingBudget: 0 }
-      }
+      contents: prompt
+    });
+    return response.text || fallback;
+  } catch (error) {
+    console.error('[Gemini Generation Failed]:', error);
+    return fallback;
+  }
+}
+
+/**
+ * Handles conversational operations assistant messages.
+ * 
+ * @param {string} message - User query.
+ * @param {object} digest - Operations risk digest object.
+ * @param {Array} history - Conversational turn history.
+ * @returns {Promise<string>} AI chat response text.
+ */
+export async function generateAIChat(message, digest, history) {
+  const client = getClient();
+  const fallback = 'Operations center offline fallback: Please consult a stadium steward or follow overhead screens.';
+
+  if (!client) return fallback;
+
+  const chatHistory = history.map(turn => ({
+    role: turn.role === 'user' ? 'user' : 'model',
+    parts: [{ text: turn.text }]
+  }));
+
+  const systemInstruction = `
+You are the FIFA World Cup 2026 operations assistant. 
+Help the user navigate stadium zones safely.
+Your safety profile context is:
+- Zone Level: ${digest.level}
+- Zone Score: ${digest.score}/100
+- Vulnerabilities: ${JSON.stringify(digest.vulnerabilities)}
+- Language: ${digest.language}
+
+Strict constraints: Keep response under 3 sentences. Never invent weather, alert levels, or helpline numbers.
+  `;
+
+  try {
+    const chat = client.chats.create({
+      model: 'gemini-2.5-flash',
+      config: { systemInstruction },
+      history: chatHistory
     });
 
-    return { text: response.text || 'No response generated.' };
+    const response = await chat.sendMessage({ message });
+    return response.text || fallback;
   } catch (error) {
-    console.error('[Gemini Client Error]:', error.message || error);
-    throw new Error(`AI generation failed: ${error.message || 'Unknown network error'}`);
+    console.error('[Gemini Chat Failed]:', error);
+    return fallback;
   }
 }
