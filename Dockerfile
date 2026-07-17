@@ -13,8 +13,9 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev --legacy-peer-deps
 
-# Copy only the compiled code and built client assets
+# Copy only the compiled client assets and server code
 COPY --from=builder /app/dist ./dist
+COPY server/ ./server/
 
 # Create a non-root user for security
 RUN addgroup -S nodeuser && adduser -S nodeuser -G nodeuser
@@ -23,4 +24,4 @@ USER nodeuser
 EXPOSE 8080
 ENV PORT=8080
 
-CMD ["node", "dist/server/index.js"]
+CMD ["node", "server/index.js"]
